@@ -100,10 +100,10 @@ public class OnboardSync: ObservableObject {
                         testingEnabled: config.testingEnabled,
                         appName: appName,
                         backgroundColor: backgroundColor,
-                        onComplete: {
+                        onComplete: { result in
                             // Restore style immediately when complete is triggered
                             StatusBarHelper.restoreOriginalStyle()
-                            config.onComplete?()
+                            config.onComplete?(result)
                         }
                     )
                     
@@ -233,7 +233,8 @@ public class OnboardSync: ObservableObject {
             onComplete: {
                 // Restore style immediately when complete is triggered
                 StatusBarHelper.restoreOriginalStyle()
-                config.onComplete?()
+                // Fallback has no form data, so pass nil
+                config.onComplete?(nil)
             }
         )
         

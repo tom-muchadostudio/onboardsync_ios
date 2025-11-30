@@ -15,6 +15,7 @@ struct WebView: UIViewRepresentable {
     let testingEnabled: Bool
     @Binding var isInitialLoadComplete: Bool
     @Binding var showFallback: Bool
+    @Binding var formResponses: OnboardingResult?
     let onComplete: OnboardingCompleteCallback?
     let backgroundColor: Color
     
@@ -139,6 +140,9 @@ struct WebView: UIViewRepresentable {
             if messageString.starts(with: "themeStyle:") {
                 let style = String(messageString.dropFirst("themeStyle:".count))
                 handleStatusBarUpdate(style: style)
+            } else if messageString.starts(with: "form_responses:") {
+                let jsonStr = String(messageString.dropFirst("form_responses:".count))
+                handleFormResponses(jsonStr: jsonStr)
             } else if messageString == "close_pressed" {
                 handleComplete()
             } else if messageString == "request_rating" {
@@ -154,19 +158,42 @@ struct WebView: UIViewRepresentable {
             }
         }
         
+        private func handleFormResponses(jsonStr: String) {
+            debugPrint("[WebView] Received form_responses JSON")
+            
+            guard let jsonData = jsonStr.data(using: .utf8) else {
+                debugPrint("[WebView] Error: Could not convert JSON string to data")
+                return
+            }
+            
+            do {
+                let result = try JSONDecoder().decode(OnboardingResult.self, from: jsonData)
+                parent.formResponses = result
+                debugPrint("[WebView] Received \(result.responseCount) form responses from web")
+                
+                // Log each response for debugging
+                for response in result.responses {
+                    debugPrint("[WebView] Response: \"\(response.questionText)\" => \(response.answer)")
+                }
+            } catch {
+                debugPrint("[WebView] Error parsing form responses: \(error)")
+                debugPrint("[WebView] Raw JSON: \(jsonStr)")
+            }
+        }
+        
         private func handleComplete() {
             guard !hasCompletedOnboarding else { return }
             hasCompletedOnboarding = true
             
-            debugPrint("[WebView] Onboarding completed")
+            debugPrint("[WebView] Onboarding completed with \(parent.formResponses?.responseCount ?? 0) responses")
             
             // Save completion status if not in testing mode
             if !parent.testingEnabled {
                 UserDefaults.standard.set(true, forKey: UserDefaultsKeys.onboardingCompleted)
             }
             
-            // Call completion callback
-            parent.onComplete?()
+            // Call completion callback with form responses
+            parent.onComplete?(parent.formResponses)
         }
         
         private func handlePermissionRequest(permission: String) {
@@ -206,6 +233,7 @@ struct WebViewScreen: View {
     
     @State private var isInitialLoadComplete = false
     @State private var showFallback = false
+    @State private var formResponses: OnboardingResult?
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -231,8 +259,9 @@ struct WebViewScreen: View {
                             testingEnabled: testingEnabled,
                             isInitialLoadComplete: $isInitialLoadComplete,
                             showFallback: $showFallback,
-                            onComplete: {
-                                onComplete?()
+                            formResponses: $formResponses,
+                            onComplete: { result in
+                                onComplete?(result)
                                 // Small delay to ensure style restoration happens before dismiss animation
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                                     dismiss()

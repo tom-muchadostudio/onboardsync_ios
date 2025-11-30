@@ -83,8 +83,8 @@ struct FallbackView: View {
         // Mark onboarding as completed
         UserDefaults.standard.set(true, forKey: UserDefaultsKeys.onboardingCompleted)
         
-        // Call completion callback
-        onComplete?()
+        // Call completion callback with nil (fallback has no form data)
+        onComplete?(nil)
         
         // Dismiss
         dismiss()

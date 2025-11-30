@@ -7,8 +7,154 @@
 
 import Foundation
 
+/// A single question response from the onboarding flow.
+///
+/// This represents the user's answer to a single question in the
+/// onboarding flow. The `answer` type depends on the question type:
+/// - For text input questions: String
+/// - For single choice questions: String
+/// - For multiple choice questions: Array of Strings
+public struct OnboardingResponse: Codable {
+    /// The text of the question that was asked
+    public let questionText: String
+    
+    /// The type of question: 'question_text', 'question_single_choice', or 'question_multiple_choice'
+    public let questionType: String
+    
+    /// The user's answer. Can be a String or [String] depending on question type.
+    public let answer: OnboardingAnswer
+    
+    /// The screen ID where this question appeared (optional)
+    public let screenId: String?
+    
+    public init(questionText: String, questionType: String, answer: OnboardingAnswer, screenId: String? = nil) {
+        self.questionText = questionText
+        self.questionType = questionType
+        self.answer = answer
+        self.screenId = screenId
+    }
+    
+    /// Returns the answer as a String (for text and single choice questions)
+    public var answerAsString: String? {
+        switch answer {
+        case .string(let value):
+            return value
+        case .array(let values):
+            return values.first
+        }
+    }
+    
+    /// Returns the answer as an array of Strings (for multiple choice questions)
+    public var answerAsList: [String] {
+        switch answer {
+        case .string(let value):
+            return [value]
+        case .array(let values):
+            return values
+        }
+    }
+}
+
+/// Represents an answer that can be either a single string or an array of strings
+public enum OnboardingAnswer: Codable {
+    case string(String)
+    case array([String])
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let stringValue = try? container.decode(String.self) {
+            self = .string(stringValue)
+        } else if let arrayValue = try? container.decode([String].self) {
+            self = .array(arrayValue)
+        } else {
+            throw DecodingError.typeMismatch(OnboardingAnswer.self, DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Expected String or [String]"))
+        }
+    }
+    
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .string(let value):
+            try container.encode(value)
+        case .array(let values):
+            try container.encode(values)
+        }
+    }
+}
+
+/// Contains all form responses from a completed onboarding flow.
+///
+/// This object is passed to the `OnboardingCompleteCallback` when the user
+/// finishes the onboarding flow, allowing you to access all the responses
+/// the user provided to questions in the flow.
+///
+/// Example usage:
+/// ```swift
+/// OnboardSync.showOnboarding(
+///     config: OnboardSyncConfig(
+///         projectId: "xxx",
+///         secretKey: "xxx",
+///         onComplete: { result in
+///             if let result = result {
+///                 for response in result.responses {
+///                     print("\(response.questionText): \(response.answer)")
+///                 }
+///             }
+///         }
+///     )
+/// )
+/// ```
+public struct OnboardingResult: Codable {
+    /// The ID of the completed flow
+    public let flowId: String
+    
+    /// All responses from the onboarding flow
+    public let responses: [OnboardingResponse]
+    
+    public init(flowId: String, responses: [OnboardingResponse]) {
+        self.flowId = flowId
+        self.responses = responses
+    }
+    
+    /// Gets a response by matching the question text (case-insensitive)
+    public func getResponseByQuestion(_ questionText: String) -> OnboardingResponse? {
+        responses.first { $0.questionText.lowercased() == questionText.lowercased() }
+    }
+    
+    /// Gets all text input responses
+    public var textResponses: [OnboardingResponse] {
+        responses.filter { $0.questionType == "question_text" }
+    }
+    
+    /// Gets all single choice responses
+    public var singleChoiceResponses: [OnboardingResponse] {
+        responses.filter { $0.questionType == "question_single_choice" }
+    }
+    
+    /// Gets all multiple choice responses
+    public var multipleChoiceResponses: [OnboardingResponse] {
+        responses.filter { $0.questionType == "question_multiple_choice" }
+    }
+    
+    /// Gets all choice responses (single + multiple)
+    public var choiceResponses: [OnboardingResponse] {
+        responses.filter { $0.questionType == "question_single_choice" || $0.questionType == "question_multiple_choice" }
+    }
+    
+    /// Whether this result contains any responses
+    public var hasResponses: Bool {
+        !responses.isEmpty
+    }
+    
+    /// The number of responses
+    public var responseCount: Int {
+        responses.count
+    }
+}
+
 /// Callback triggered when onboarding is completed
-public typealias OnboardingCompleteCallback = () -> Void
+/// - Parameter result: Optional OnboardingResult containing form responses, or nil if no questions were answered
+public typealias OnboardingCompleteCallback = (_ result: OnboardingResult?) -> Void
 
 /// Configuration for the OnboardSync SDK
 public struct OnboardSyncConfig {
