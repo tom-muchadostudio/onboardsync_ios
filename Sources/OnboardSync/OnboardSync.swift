@@ -230,7 +230,7 @@ public class OnboardSync: ObservableObject {
         let fallbackView = FallbackView(
             appName: appName,
             backgroundColor: backgroundColor,
-            onComplete: {
+            onComplete: { _ in
                 // Restore style immediately when complete is triggered
                 StatusBarHelper.restoreOriginalStyle()
                 // Fallback has no form data, so pass nil
