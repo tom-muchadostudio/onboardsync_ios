@@ -84,10 +84,16 @@ struct ContentView: View {
             projectId: "your-project-id",
             secretKey: "your-secret-key",
             testingEnabled: false, // Set to true during development
-            onComplete: {
+            onComplete: { result in
                 // Called when onboarding completes
                 print("Onboarding completed!")
-                // You might want to show a paywall or welcome screen here
+                
+                // Access form responses if available
+                if let result = result {
+                    for response in result.responses {
+                        print("\(response.questionText): \(response.answerAsString ?? "")")
+                    }
+                }
             }
         )
         
@@ -116,10 +122,17 @@ class ViewController: UIViewController {
             projectId: "your-project-id",
             secretKey: "your-secret-key",
             testingEnabled: false, // Set to true during development
-            onComplete: { [weak self] in
+            onComplete: { [weak self] result in
                 // Called when onboarding completes
                 print("Onboarding completed!")
-                // You might want to show a paywall or welcome screen here
+                
+                // Access form responses if available
+                if let result = result {
+                    for response in result.responses {
+                        print("\(response.questionText): \(response.answerAsString ?? "")")
+                    }
+                }
+                
                 self?.showMainContent()
             }
         )
@@ -144,7 +157,7 @@ let config = OnboardSyncConfig(
     projectId: String,      // Your OnboardSync project ID
     secretKey: String,      // Your OnboardSync secret key
     testingEnabled: Bool,   // If true, shows onboarding every time (default: false)
-    onComplete: (() -> Void)? // Optional callback when onboarding completes
+    onComplete: ((OnboardingResult?) -> Void)? // Optional callback with form responses
 )
 ```
 
@@ -156,6 +169,42 @@ Displays the onboarding flow for your project.
 OnboardSync.showOnboarding(
     config: OnboardSyncConfig // Your configuration
 )
+```
+
+### `OnboardingResult`
+
+Contains all form responses from a completed onboarding flow.
+
+```swift
+struct OnboardingResult {
+    let flowId: String                    // The ID of the completed flow
+    let responses: [OnboardingResponse]   // All form responses
+    
+    // Helper methods
+    func getResponseByQuestion(_ questionText: String) -> OnboardingResponse?
+    var textResponses: [OnboardingResponse]           // Text input responses only
+    var singleChoiceResponses: [OnboardingResponse]   // Single choice responses only
+    var multipleChoiceResponses: [OnboardingResponse] // Multiple choice responses only
+    var hasResponses: Bool                            // Whether any responses exist
+    var responseCount: Int                            // Number of responses
+}
+```
+
+### `OnboardingResponse`
+
+A single question response from the onboarding flow.
+
+```swift
+struct OnboardingResponse {
+    let questionText: String    // The question that was asked
+    let questionType: String    // 'question_text', 'question_single_choice', or 'question_multiple_choice'
+    let answer: OnboardingAnswer // The user's answer
+    let screenId: String?       // The screen ID where this question appeared
+    
+    // Helper properties
+    var answerAsString: String? // Answer as a single string
+    var answerAsList: [String]  // Answer as an array of strings
+}
 ```
 
 ## Configuration
@@ -237,11 +286,34 @@ UserDefaults.standard.set(false, forKey: "onboardingCompleted")
 let config = OnboardSyncConfig(
     projectId: "[project_key]",
     secretKey: "[secret_key]",
-    onComplete: {
-        // Navigate to next screen
-        // Show a paywall
-        // Request additional permissions
-        // Or any other post-onboarding action
+    onComplete: { result in
+        // Access form responses
+        if let result = result, result.hasResponses {
+            // Get a specific response by question text
+            if let nameResponse = result.getResponseByQuestion("What's your name?") {
+                print("User name: \(nameResponse.answerAsString ?? "Unknown")")
+            }
+            
+            // Iterate through all responses
+            for response in result.responses {
+                switch response.questionType {
+                case "question_text":
+                    print("Text answer: \(response.answerAsString ?? "")")
+                case "question_single_choice":
+                    print("Selected: \(response.answerAsString ?? "")")
+                case "question_multiple_choice":
+                    print("Selected options: \(response.answerAsList)")
+                default:
+                    break
+                }
+            }
+            
+            // Get responses by type
+            let textResponses = result.textResponses
+            let choiceResponses = result.choiceResponses
+        }
+        
+        // Navigate to next screen, show paywall, etc.
     }
 )
 ```
@@ -255,6 +327,7 @@ The SDK communicates with your onboarding web content through a JavaScript bridg
 - `"themeStyle:light"` or `"themeStyle:dark"` - Updates the status bar style
 - `"request_permission:type"` - Requests system permissions (camera, photos, location, etc.)
 - `"initial_load_complete"` - Signals that the web content has loaded
+- `"form_responses:{json}"` - Sends form responses as JSON to the SDK
 
 ## Error Handling
 
