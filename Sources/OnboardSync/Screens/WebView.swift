@@ -245,7 +245,7 @@ struct WebViewScreen: View {
                 FallbackView(
                     appName: appName,
                     backgroundColor: backgroundColor,
-                    onComplete: {
+                    onComplete: { _ in
                         debugPrint("[WebViewScreen] Fallback screen continue pressed after error")
                         dismiss()
                     }
