@@ -14,11 +14,12 @@ import Foundation
 /// - For text input questions: String
 /// - For single choice questions: String
 /// - For multiple choice questions: Array of Strings
+/// - For picker questions: Array of Strings (e.g., ["175"] for height, ["June", "15", "1995"] for date)
 public struct OnboardingResponse: Codable {
     /// The text of the question that was asked
     public let questionText: String
     
-    /// The type of question: 'question_text', 'question_single_choice', or 'question_multiple_choice'
+    /// The type of question: 'question_text', 'question_single_choice', 'question_multiple_choice', or 'question_picker'
     public let questionType: String
     
     /// The user's answer. Can be a String or [String] depending on question type.
@@ -27,11 +28,15 @@ public struct OnboardingResponse: Codable {
     /// The screen ID where this question appeared (optional)
     public let screenId: String?
     
-    public init(questionText: String, questionType: String, answer: OnboardingAnswer, screenId: String? = nil) {
+    /// The measurement unit for height/weight pickers: 'metric' or 'imperial' (optional)
+    public let unit: String?
+    
+    public init(questionText: String, questionType: String, answer: OnboardingAnswer, screenId: String? = nil, unit: String? = nil) {
         self.questionText = questionText
         self.questionType = questionType
         self.answer = answer
         self.screenId = screenId
+        self.unit = unit
     }
     
     /// Returns the answer as a String (for text and single choice questions)
@@ -52,6 +57,21 @@ public struct OnboardingResponse: Codable {
         case .array(let values):
             return values
         }
+    }
+    
+    /// Whether this response is from a picker question
+    public var isPicker: Bool {
+        questionType == "question_picker"
+    }
+    
+    /// Whether this response uses metric units (for height/weight pickers)
+    public var isMetric: Bool {
+        unit == "metric"
+    }
+    
+    /// Whether this response uses imperial units (for height/weight pickers)
+    public var isImperial: Bool {
+        unit == "imperial"
     }
 }
 
@@ -139,6 +159,11 @@ public struct OnboardingResult: Codable {
     /// Gets all choice responses (single + multiple)
     public var choiceResponses: [OnboardingResponse] {
         responses.filter { $0.questionType == "question_single_choice" || $0.questionType == "question_multiple_choice" }
+    }
+    
+    /// Gets all picker responses (height, weight, date, custom pickers)
+    public var pickerResponses: [OnboardingResponse] {
+        responses.filter { $0.questionType == "question_picker" }
     }
     
     /// Whether this result contains any responses
